@@ -20,10 +20,7 @@
     {
       "js": [
         "/shared/main.js",
-        "/shared/config.js",
-        "/shared/https.js",
         "/shared/utils.js",
-        "/shared/banners.js",
         "/content-script/main.js"
       ],
       "css": ["/content-script/main.css"],
@@ -56,9 +53,5 @@
   "host_permissions": [
     "*://www.youtube.com/*",
     "*://m.youtube.com/*"
-  ],
-  "web_accessible_resources": [{
-    "resources": ["/images/rys.svg"],
-    "matches": ["*://www.youtube.com/*", "*://m.youtube.com/*"]
-  }]
+  ]
 }

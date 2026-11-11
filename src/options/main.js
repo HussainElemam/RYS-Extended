@@ -14,8 +14,6 @@ let currentUrl;
 
 
 document.addEventListener("DOMContentLoaded", () => {
-  recordEvent('Page View: Options');
-  initAnnouncementBanner();
   browser.storage.local.get(localSettings => {
     const revealUpdates = migrateRevealSettings(localSettings);
     if (Object.keys(revealUpdates).length) {
@@ -24,23 +22,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const settings = { ...DEFAULT_SETTINGS, ...localSettings };
 
-    const tier = License.getTierSync(localSettings['license_token'], localSettings['session_token']);
-    HTML.setAttribute('tier', tier);
-    if (tier === TIER.FREE) {
-      clearAllPremium(settings);
-    } else if (tier === TIER.FREE_SIGNED_IN) {
-      enforceSlotBudget(settings, PREMIUM_CONFIG.FREE_PREMIUM_SLOTS);
-    }
-
     const headerSettings = Object.entries(OTHER_SETTINGS).reduce((acc, [id, value]) => {
       acc[id] = id in localSettings ? localSettings[id] : value;
       return acc;
     }, {});
-
-    // Show logging opt-in modal if user hasn't responded yet
-    if (!localSettings.log_prompt_answered) {
-      showLogPrompt();
-    }
 
     browser.tabs.query({ currentWindow: true, active: true }, tabs => {
       if (!tabs || tabs.length === 0) return;
@@ -77,7 +62,7 @@ function refreshActiveSection() {
   let count = 0;
   SECTIONS.forEach(s => {
     s.options.forEach(option => {
-      const { id, name, effects, display, premium } = option;
+      const { id, name, effects, display } = option;
       if (display === false) return;
       if (!cache[id]) return;
 
@@ -86,7 +71,6 @@ function refreshActiveSection() {
       optionNode.classList.remove('removed');
       optionNode.removeAttribute('id');
       optionNode.setAttribute('name', name);
-      if (premium) optionNode.setAttribute('data-premium', 'true');
       optionNode.querySelector('.option_label').innerText = name;
 
       const svg = optionNode.querySelector('svg');
@@ -151,10 +135,9 @@ function populateOptions(SECTIONS, headerSettings, SETTING_VALUES) {
     sectionNode.setAttribute('tags', tags);
     const label = sectionNode.querySelector('.section_label > a');
     label.innerText = name;
-    label.setAttribute('href', sectionNameToUrl(name));
 
     options.forEach(option => {
-      const { id, name, tags, defaultValue, effects, display, premium } = option;
+      const { id, name, tags, defaultValue, effects, display } = option;
       if (display === false) return;
 
       const optionNode = TEMPLATE_OPTION.cloneNode(true);
@@ -166,11 +149,6 @@ function populateOptions(SECTIONS, headerSettings, SETTING_VALUES) {
       const optionLabel = optionNode.querySelector('.option_label');
       optionLabel.innerText = name;
 
-      // Mark premium options
-      if (premium) {
-        optionNode.setAttribute('data-premium', 'true');
-      }
-
       const svg = optionNode.querySelector('svg');
       const value = id in SETTING_VALUES ? SETTING_VALUES[id] : defaultValue;
       HTML.setAttribute(id, value);
@@ -178,18 +156,6 @@ function populateOptions(SECTIONS, headerSettings, SETTING_VALUES) {
       svg.toggleAttribute('active', value);
 
       optionNode.addEventListener('click', async e => {
-        const tier = HTML.getAttribute('tier');
-        if (premium && tier !== TIER.PREMIUM) {
-          const togglingOn = cache[id] !== true;
-          const hasSlot = tier === TIER.FREE_SIGNED_IN &&
-                          countActivePremium(cache) < PREMIUM_CONFIG.FREE_PREMIUM_SLOTS;
-          if (togglingOn && !hasSlot) {
-            if (tier === TIER.FREE_SIGNED_IN) openUpgradeModal({ reason: 'slot_limit' });
-            else openPremiumRequiredModal();
-            return;
-          }
-        }
-
         const value = svg.toggleAttribute('active');
         updateSetting(id, value, { manual: true });
 
@@ -208,15 +174,9 @@ function populateOptions(SECTIONS, headerSettings, SETTING_VALUES) {
     OPTIONS_LIST.append(sectionNode);
   });
 
-  // Add "Free", "All", and "Active" sidebar items at the top
+  // Add "All" and "Active" sidebar items at the top
   const sidebarTopRow = document.createElement('div');
   sidebarTopRow.id = 'sidebar_top_row';
-
-  const freeSidebar = document.createElement('div');
-  freeSidebar.id = 'free_sidebar';
-  freeSidebar.className = 'sidebar_section';
-  freeSidebar.innerText = 'free';
-  freeSidebar.addEventListener('click', freeSidebarListener);
 
   const allSidebar = document.createElement('div');
   allSidebar.id = 'all_sidebar';
@@ -230,7 +190,7 @@ function populateOptions(SECTIONS, headerSettings, SETTING_VALUES) {
   activeSidebar.innerHTML = '<span>active</span><span class="active_count"></span>';
   activeSidebar.addEventListener('click', activeSidebarListener);
 
-  sidebarTopRow.append(freeSidebar, allSidebar, activeSidebar);
+  sidebarTopRow.append(allSidebar, activeSidebar);
   SIDEBAR.append(sidebarTopRow);
 
   // Add sections to the sidebar
@@ -261,9 +221,7 @@ function populateOptions(SECTIONS, headerSettings, SETTING_VALUES) {
     });
   }
 
-  // Pre-select the sidebar section for the current page. Elsewhere, free users
-  // default to "Free" and premium users to "Basic".
-  const tier = License.getTierSync(SETTING_VALUES['license_token'], SETTING_VALUES['session_token']);
+  // Pre-select the sidebar section for the current page; default to "Basic".
   if (resultsPageRegex.test(currentUrl)) {
     qs('.sidebar_section[tag="Search"]').click();
   } else if (videoPageRegex.test(currentUrl)) {
@@ -274,13 +232,9 @@ function populateOptions(SECTIONS, headerSettings, SETTING_VALUES) {
     qs('.sidebar_section[tag="Channel"]').click();
   } else if (homepageRegex.test(currentUrl)) {
     qs('.sidebar_section[tag="Homepage"]').click();
-  } else if (tier !== TIER.PREMIUM) {
-    qs('#free_sidebar').click();
   } else {
     qs('.sidebar_section[tag="Basic"]').click();
   }
-
-  updateSlotIndicator();
 
   const searchBar = document.getElementById('search_bar');
   searchBar.addEventListener('input', onSearchInput);
@@ -381,26 +335,6 @@ function updateTimeInfo() {
 
 function updateSetting(id, value, { write=true, manual=false }={}) {
 
-  // Clamp premium writes that would exceed the free-tier slot budget, so chained
-  // effects behave the same as direct toggles.
-  if (PREMIUM_FEATURE_ID_SET.has(id) && value === true) {
-    const tier = HTML.getAttribute('tier');
-    if (tier === TIER.FREE) {
-      value = false;
-    } else if (tier === TIER.FREE_SIGNED_IN && cache[id] !== true &&
-               countActivePremium(cache) >= PREMIUM_CONFIG.FREE_PREMIUM_SLOTS) {
-      value = false;
-    }
-  }
-
-  // The keyword list is personal: log how many entries it has, not the entries.
-  if (manual) {
-    recordEvent('Setting changed', {
-      id,
-      value: id === 'blocked_keywords' ? parseBlockedKeywords(value).length : value,
-    });
-  }
-
   HTML.setAttribute(id, value);
   cache[id] = value;
 
@@ -430,8 +364,6 @@ function updateSetting(id, value, { write=true, manual=false }={}) {
   }
 
   refreshActiveSection();
-
-  if (PREMIUM_FEATURE_ID_SET.has(id)) updateSlotIndicator();
 }
 
 
@@ -499,34 +431,6 @@ function showAll() {
 }
 
 
-function freeSidebarListener(e) {
-  const target = e.currentTarget;
-  qsa('.sidebar_section').forEach(s => {
-    if (s !== target) s.removeAttribute('selected');
-  });
-  target.setAttribute('selected', '');
-
-  const activeSection = document.getElementById('active_section');
-  if (activeSection) activeSection.classList.add('removed');
-
-  const sections = qsa('.section_container:not(#template_section):not(#active_section)');
-  sections.forEach(section => {
-    section.classList.remove('removed');
-    let hasFreeOption = false;
-    section.querySelectorAll('div.option').forEach(opt => {
-      if (opt.getAttribute('data-premium') === 'true') {
-        opt.classList.add('removed');
-      } else {
-        opt.classList.remove('removed');
-        hasFreeOption = true;
-      }
-    });
-    if (!hasFreeOption) section.classList.add('removed');
-  });
-  setSelectionLabel('free');
-}
-
-
 function activeSidebarListener(e) {
   const target = e.currentTarget;
   const selected = target.toggleAttribute('selected');
@@ -549,8 +453,6 @@ function sidebarSectionListener(e) {
   const sidebarSection = e.target;
   const wasSelected = sidebarSection.hasAttribute('selected');
   const tag = sidebarSection.getAttribute('tag');
-
-  recordEvent('Section selected', { tag, selected: !wasSelected });
 
   showAll();
   if (wasSelected) return;
@@ -653,44 +555,3 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-
-// Announcement banners
-function initAnnouncementBanner() {
-  const container = document.getElementById('banner_container');
-  if (!container) return;
-
-  const logoUrl = browser.runtime.getURL('images/rys.svg');
-  const banners = getActiveBanners('options');
-
-  banners.forEach(banner => {
-    initBanner(banner, logoUrl, () => ({
-      element: container,
-      insertMethod: 'append'
-    }));
-  });
-}
-
-
-// Logging opt-in banner
-function showLogPrompt() {
-  const banner = document.getElementById('log_prompt_banner');
-  const yesBtn = document.getElementById('log_prompt_yes');
-  const noBtn = document.getElementById('log_prompt_no');
-  const dismissBtn = document.getElementById('log_prompt_dismiss');
-
-  banner.hidden = false;
-
-  yesBtn.addEventListener('click', () => {
-    browser.storage.local.set({ log_enabled: true, log_prompt_answered: true });
-    banner.hidden = true;
-  }, { once: true });
-
-  noBtn.addEventListener('click', () => {
-    browser.storage.local.set({ log_enabled: false, log_prompt_answered: true });
-    banner.hidden = true;
-  }, { once: true });
-
-  dismissBtn.addEventListener('click', () => {
-    banner.hidden = true;
-  }, { once: true });
-}

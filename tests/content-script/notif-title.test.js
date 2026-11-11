@@ -9,13 +9,6 @@ const { loadSourceFile, resetStorage, setStorageData } = require('../setup');
  * mutations as navigations.
  */
 
-function premiumJWT() {
-  const encode = obj => Buffer.from(JSON.stringify(obj)).toString('base64url');
-  const now = Math.floor(Date.now() / 1000);
-  const payload = { email: 't@example.com', premium: true, iat: now, exp: now + 86400 };
-  return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.sig`;
-}
-
 // Loads the real content script with a document whose title counts writes.
 // document.hidden stops the polling loop after its first pass.
 function loadWithTitle(initialTitle) {
@@ -35,7 +28,6 @@ function loadWithTitle(initialTitle) {
   };
   const stubs = { document, location: { href: 'https://www.youtube.com/watch?v=x' }, window: {} };
   const utils = loadSourceFile('shared/utils.js', stubs);
-  const config = loadSourceFile('shared/config.js');
   const shared = loadSourceFile('shared/main.js');
   const cs = loadSourceFile('content-script/main.js', {
     ...stubs,
@@ -44,14 +36,8 @@ function loadWithTitle(initialTitle) {
     shortsRegex: utils.shortsRegex, videoPageRegex: utils.videoPageRegex,
     channelRegex: utils.channelRegex, subsRegex: utils.subsRegex,
     checkSchedule: utils.checkSchedule,
-    PREMIUM_CONFIG: config.PREMIUM_CONFIG, TIER: config.TIER,
     DEFAULT_SETTINGS: shared.DEFAULT_SETTINGS,
     migrateRevealSettings: shared.migrateRevealSettings,
-    clearAllPremium: shared.clearAllPremium,
-    enforceSlotBudget: shared.enforceSlotBudget,
-    countActivePremium: shared.countActivePremium,
-    PREMIUM_FEATURE_ID_SET: shared.PREMIUM_FEATURE_ID_SET,
-    PREMIUM_FEATURE_IDS: shared.PREMIUM_FEATURE_IDS,
   });
   return { state, cs };
 }
@@ -62,8 +48,6 @@ describe('remove_notif_bell tab title', () => {
     setStorageData({
       remove_notif_bell: true,
       redirect_off: true,
-      license_token: premiumJWT(),
-      session_token: 'session',
     });
   });
 

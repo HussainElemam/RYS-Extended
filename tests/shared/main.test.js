@@ -60,28 +60,6 @@ describe('Main Settings', () => {
     });
   });
 
-  describe('sectionNameToUrl', () => {
-    it('should convert simple section name to URL', () => {
-      const url = main.sectionNameToUrl('General');
-      assert.strictEqual(url, 'https://lawrencehook.com/rys/features/general/');
-    });
-
-    it('should handle spaces by converting to underscores', () => {
-      const url = main.sectionNameToUrl('Video Player');
-      assert.strictEqual(url, 'https://lawrencehook.com/rys/features/video_player/');
-    });
-
-    it('should handle " - " by converting to underscore', () => {
-      const url = main.sectionNameToUrl('Video Player - UX');
-      assert.strictEqual(url, 'https://lawrencehook.com/rys/features/video_player_ux/');
-    });
-
-    it('should handle complex names', () => {
-      const url = main.sectionNameToUrl('Left Navigation Bar Sections');
-      assert.strictEqual(url, 'https://lawrencehook.com/rys/features/left_navigation_bar_sections/');
-    });
-  });
-
   describe('idToShortId and shortIdToId', () => {
     it('should have bidirectional mapping for all entries', () => {
       const ids = Object.keys(main.idToShortId);
@@ -206,21 +184,6 @@ describe('Main Settings', () => {
         }
       }
     });
-
-    it('premium options should be marked consistently', () => {
-      for (const section of main.SECTIONS) {
-        for (const option of section.options) {
-          // premium should be either true or undefined (not false)
-          if ('premium' in option) {
-            assert.strictEqual(
-              option.premium,
-              true,
-              `Option ${option.id} has premium: ${option.premium} (should be true or omitted)`
-            );
-          }
-        }
-      }
-    });
   });
 });
 
@@ -293,17 +256,11 @@ describe('Keyword blocking', () => {
     kw.titleHasBlockedKeyword(title, kw.compileBlockedKeywords(keywords));
 
   describe('settings', () => {
-    it('is a premium setting, off by default, with an empty list', () => {
+    it('is off by default, with an empty list', () => {
       const option = kw.SECTIONS.flatMap(s => s.options).find(o => o.id === 'remove_keyword_videos');
       assert.ok(option, 'option missing from SECTIONS');
-      assert.strictEqual(option.premium, true);
       assert.strictEqual(kw.DEFAULT_SETTINGS.remove_keyword_videos, false);
       assert.strictEqual(kw.DEFAULT_SETTINGS.blocked_keywords, '');
-    });
-
-    it('counts the toggle, not the list, as the premium feature', () => {
-      assert.strictEqual(kw.PREMIUM_FEATURE_ID_SET.has('remove_keyword_videos'), true);
-      assert.strictEqual(kw.PREMIUM_FEATURE_ID_SET.has('blocked_keywords'), false);
     });
 
     it('can be exported and imported', () => {
