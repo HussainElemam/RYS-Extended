@@ -1,5 +1,5 @@
 {
-  "name": "RYS — Remove YouTube Suggestions",
+  "name": "RYS - Extended",
   "description": "Spend less time on YouTube. Customize YouTube's user interface to be less engaging.",
   "homepage_url": "https://github.com/HussainElemam/RYS-Extended",
   "manifest_version": 3,
@@ -34,7 +34,7 @@
 
   "action": {
     "default_popup": "/options/main.html",
-    "default_title": "Remove Youtube Suggestions",
+    "default_title": "RYS - Extended",
     "default_icon": {
       "16": "/images/16.png",
       "32": "/images/32.png",

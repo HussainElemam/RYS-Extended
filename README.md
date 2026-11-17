@@ -1,4 +1,4 @@
-# RYS Extended
+# RYS - Extended
 
 A personal fork of [RYS — Remove YouTube Suggestions](https://github.com/lawrencehook/remove-youtube-suggestions)
 by [Lawrence Hook](https://lawrencehook.com). All credit for the extension goes
