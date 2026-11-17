@@ -77,6 +77,7 @@ function refreshActiveSection() {
       svg.toggleAttribute('active', true);
 
       optionNode.addEventListener('click', async e => {
+        if (!allowLoosening()) return;
         updateSetting(id, false, { manual: true });
         // Sync the original toggle
         const originalSvg = document.querySelector(`div#${id} svg`);
@@ -156,7 +157,10 @@ function populateOptions(SECTIONS, headerSettings, SETTING_VALUES) {
       svg.toggleAttribute('active', value);
 
       optionNode.addEventListener('click', async e => {
-        const value = svg.toggleAttribute('active');
+        const value = !svg.hasAttribute('active');
+        if (changesLoosen(toggleChanges(id, value), cache) && !allowLoosening()) return;
+
+        svg.toggleAttribute('active', value);
         updateSetting(id, value, { manual: true });
 
         if (effects && value in effects) {
@@ -216,6 +220,7 @@ function populateOptions(SECTIONS, headerSettings, SETTING_VALUES) {
       const elt = document.querySelector(`#${id}`);
       elt?.addEventListener('click', e => {
         const value = !(HTML.getAttribute(id) === 'true');
+        if (id === 'global_enable' && !value && !allowLoosening()) return;
         updateSetting(id, value, { manual: true });
       });
     });

@@ -21,6 +21,7 @@ POWER_OPTIONS.forEach(o => {
 
   o.addEventListener('click', e => {
     const enabled = HTML.getAttribute('global_enable') === 'true';
+    if (enabled && !allowLoosening()) return;
     const nextTimedChange = Date.now() + 60_000 * Number(minutes);
 
     updateSetting('global_enable', !enabled);
@@ -68,7 +69,9 @@ scheduleModalContainer.addEventListener('click', e => {
   closeScheduleModal();
 });
 
+// The schedule decides when RYS is off, so any edit to it waits.
 function openScheduleModal() {
+  if (!allowLoosening()) return;
   scheduleModalContainer.removeAttribute('hidden');
 
   // Populate with local data.
@@ -88,6 +91,7 @@ OPEN_SCHEDULE_OPTION.addEventListener('click', e => {
 });
 RESUME_SCHEDULE_OPTION.addEventListener('click', e => {
   const scheduleIsActive = checkSchedule(cache['scheduleTimes'], cache['scheduleDays']);
+  if (!scheduleIsActive && cache['global_enable'] && !allowLoosening()) return;
 
   updateSetting('global_enable', scheduleIsActive);
   updateSetting('nextTimedChange', false);
@@ -235,6 +239,7 @@ DISABLE_PASSWORD_BUTTON.addEventListener('click', e => {
     displayStatus('Wrong password');
     return;
   }
+  if (!allowLoosening()) return;
 
   // Disable password settings.
   updateSetting('password', false, { manual: true });
@@ -275,6 +280,7 @@ importModalContainer.addEventListener('click', e => {
 });
 
 importSubmit.addEventListener('click', e => {
+  if (!allowLoosening()) return;
   const settingsStr = importInput.value;
 
   try {
@@ -373,11 +379,13 @@ const PILL_LISTS = {
     container: 'grayscale_exempt_container',
     toggle: 'grayscale_mode',
     parse: parseGrayscaleExemptChannels,
+    loosensWhen: 'added',
   },
   blocked_keywords: {
     container: 'blocked_keywords_container',
     toggle: 'remove_keyword_videos',
     parse: parseBlockedKeywords,
+    loosensWhen: 'removed',
   },
 };
 
@@ -413,21 +421,25 @@ function renderPills(id, value) {
   });
 }
 
-function savePills(id) {
-  updateSetting(id, pillListItems(id).join(', '), { manual: true });
-}
-
 // Save the pending input (and the removal of `removeItem`, if given) together,
-// before rebuilding the pills. `parse` normalizes and drops duplicates.
+// before rebuilding the pills. `parse` normalizes and drops duplicates. A
+// looser edit (see loosensWhen) waits, keeping the typed text for later.
 function commitPillInput(id, removeItem) {
   const input = pillListInput(id);
   const raw = input.value.trim().replace(/,+$/, '').trim();
-  input.value = '';
-  if (!raw && !removeItem) return;
+  if (!raw && !removeItem) {
+    input.value = '';
+    return;
+  }
 
-  const items = pillListItems(id).filter(item => item !== removeItem);
+  const oldItems = pillListItems(id);
+  const items = oldItems.filter(item => item !== removeItem);
   if (raw) items.push(raw);
-  updateSetting(id, PILL_LISTS[id].parse(items.join(', ')).join(', '), { manual: true });
+  const newItems = PILL_LISTS[id].parse(items.join(', '));
+  if (pillChangeLoosens(PILL_LISTS[id].loosensWhen, oldItems, newItems) && !allowLoosening()) return;
+
+  input.value = '';
+  updateSetting(id, newItems.join(', '), { manual: true });
 }
 
 // Move the container beneath its toggle row and wire the input.
@@ -449,11 +461,8 @@ function initPillListUI(id, value) {
       e.preventDefault();
       commitPillInput(id);
     } else if (e.key === 'Backspace' && input.value === '') {
-      const pills = qsa('.pill', box);
-      if (pills.length) {
-        pills[pills.length - 1].remove();
-        savePills(id);
-      }
+      const items = pillListItems(id);
+      if (items.length) commitPillInput(id, items[items.length - 1]);
     }
   });
   // Moving focus to a remove button must not rebuild it before its click.

@@ -21,6 +21,7 @@
     <script defer src="/options/reload.js"></script>
     <script defer src="/options/main.js"></script>
     <script defer src="/options/settings-menu.js"></script>
+    <script defer src="/options/wait-lock.js"></script>
 
   </head>
 
@@ -118,6 +119,24 @@
 
     </div>
 
+    <div id="wait_container_background" hidden>
+      <div id="wait_container">
+        <div class="wait_title">Wait before turning things off</div>
+        <p>Turning RYS or an option off, removing a blocked word, editing the
+          schedule, removing the password or importing settings only works
+          after the menu has been open this long. Turning things on is never
+          delayed.</p>
+        <div id="wait_presets" class="predefined-options">
+          <a minutes="0">Off</a>
+          <a minutes="1">1 min</a>
+          <a minutes="2">2 min</a>
+          <a minutes="5">5 min</a>
+          <a minutes="10">10 min</a>
+        </div>
+        <label>Minutes <input id="wait_minutes" type="number" min="0" max="120" step="1"></label>
+      </div>
+    </div>
+
     <div id="timer_container">
       <div>Menu Timer</div>
       <div></div>
@@ -148,6 +167,7 @@
     <div id='settings-menu' class='hidden'>
       <div id='settings-password'>Password</div>
       <div id='settings-schedule'>Schedule</div>
+      <div id='settings-wait'>Wait to turn off</div>
       <hr>
       <div id='import-settings'>Import settings</div>
       <div id='export-settings'>Export settings</div>
@@ -264,6 +284,7 @@
     <div id='footer'>
 
       <a id='reload_button' title='Reload the current page'>Reload</a>
+      <span id='wait_status' hidden></span>
 
     </div>
 

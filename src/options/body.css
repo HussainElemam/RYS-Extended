@@ -133,6 +133,60 @@ html[foo="bar"] {
 }
 
 
+/* Wait-to-turn-off Modal */
+#wait_container_background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 100;
+
+  background-color: rgba(0, 0, 0, 0.6);
+
+  display: flex;
+}
+
+#wait_container, #wait_container * {
+  color: var(--body-color);
+}
+
+#wait_container {
+  height: fit-content;
+  width: min(80vw, 420px);
+  margin-top: calc(2 * var(--header-height));
+  margin-right: auto;
+  margin-left: auto;
+  padding: 20px;
+
+  text-align: center;
+
+  background-color: var(--body-background-color);
+  border: 1px solid var(--box-shadow-color);
+  border-radius: 2px;
+
+  display: flex;
+  gap: 12px;
+  flex-direction: column;
+  align-items: center;
+}
+
+#wait_container .wait_title {
+  font-weight: bold;
+}
+
+#wait_container p {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+#wait_container input {
+  width: 60px;
+  margin-left: 5px;
+  padding: 2px 5px;
+}
+
+
 /* Scheduling Modal */
 #schedule_container_background {
   position: fixed;

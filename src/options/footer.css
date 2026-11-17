@@ -35,3 +35,12 @@ html[dark_mode='true'] .footer-path {
   cursor: pointer;
   background-color: var(--box-shadow-color);
 }
+
+#wait_status {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+#wait_status[locked] {
+  color: var(--red-color);
+}

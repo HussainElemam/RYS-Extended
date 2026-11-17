@@ -638,6 +638,7 @@ const OTHER_SETTINGS = {
   dark_mode: false,
   grayscale_exempt_channels: '',
   blocked_keywords: '',
+  unlock_delay: 0, // minutes; see "Wait before turning things off" below
   ...TIMED_SETTINGS,
   ...SCHEDULE_SETTINGS,
   ...PASSWORD_SETTINGS,
@@ -773,6 +774,7 @@ const idToShortId = {
   "power_btn_active_during_schedule":  '99',
   "remove_keyword_videos":             '100',
   "blocked_keywords":                  '101',
+  "unlock_delay":                      '102',
 };
 
 
@@ -856,4 +858,54 @@ function titleHasBlockedKeyword(title, matchers) {
   const text = normalizeKeywordText(title);
   if (!text) return false;
   return matchers.some(matcher => matcher.test(text));
+}
+
+
+/*************************************
+ * Wait before turning things off
+ *************************************/
+
+// With `unlock_delay` set, changes that show more of YouTube or weaken a lock
+// only work once the menu has been open that long. Turning things on is never
+// delayed. Most options are stricter when true; these are looser when true.
+const LOOSE_WHEN_TRUE = new Set([
+  'redirect_off',
+  'add_reveal_homepage',
+  'add_reveal_sidebar',
+  'add_reveal_end_of_video',
+  'power_btn_active_during_schedule',
+]);
+
+// Every setting a toggle click changes: the option itself plus its effects.
+function toggleChanges(id, value) {
+  const option = SECTIONS.flatMap(s => s.options).find(o => o.id === id);
+  return { [id]: value, ...(option?.effects?.[value] || {}) };
+}
+
+// True if applying `changes` (option ids or global_enable) to the `current`
+// settings loosens anything, e.g. an option turned off, even as a side effect.
+function changesLoosen(changes, current) {
+  return Object.entries(changes).some(([id, value]) => {
+    const loose = LOOSE_WHEN_TRUE.has(id);
+    return Boolean(value) === loose && Boolean(current[id]) !== loose;
+  });
+}
+
+// For a pill list, `loosensWhen` says which edit is looser: removing a blocked
+// keyword ('removed'), or adding a channel that stays in color ('added').
+function pillChangeLoosens(loosensWhen, oldItems, newItems) {
+  const key = item => item.toLowerCase();
+  const oldKeys = new Set(oldItems.map(key));
+  const newKeys = new Set(newItems.map(key));
+  if (loosensWhen === 'removed') return [...oldKeys].some(k => !newKeys.has(k));
+  if (loosensWhen === 'added') return [...newKeys].some(k => !oldKeys.has(k));
+  return false;
+}
+
+// The delay in minutes, as a whole number from 0 to 120. Imported settings
+// arrive as strings.
+function parseUnlockDelay(value) {
+  const minutes = Math.floor(Number(value));
+  if (!Number.isFinite(minutes) || minutes < 0) return 0;
+  return Math.min(minutes, 120);
 }
