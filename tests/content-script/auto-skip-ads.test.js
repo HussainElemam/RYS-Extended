@@ -126,4 +126,30 @@ describe('auto_skip_ads', () => {
     cs.restoreAdPlayback();
     assert.strictEqual(player.video.muted, true);
   });
+
+  it('hides its own 10x ratechange from other listeners, but not the restore', () => {
+    let stopped = 0;
+    const event = () => ({ target: player.video, stopImmediatePropagation: () => { stopped += 1; } });
+
+    player.ad = true;
+    cs.skipAds();
+    cs.hideAdRateChange(event());
+    assert.strictEqual(stopped, 1);
+
+    player.ad = false;
+    cs.skipAds();
+    cs.hideAdRateChange(event());
+    assert.strictEqual(stopped, 1, 'the restore to 1.5x must reach other listeners');
+  });
+
+  it('undoes a 10x another extension re-applies right after the ad', () => {
+    player.ad = true;
+    cs.skipAds();
+    player.ad = false;
+    cs.skipAds();
+
+    player.video.playbackRate = 10; // e.g. a speed extension re-applying its saved rate
+    cs.skipAds();
+    assert.strictEqual(player.video.playbackRate, 1.5);
+  });
 });

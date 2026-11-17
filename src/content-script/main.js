@@ -71,6 +71,7 @@ let keywordMatchers = [];
 let keywordSource;
 let url = location.href;
 let theaterClicked = false, adActive = false, adHandled = false, mutedBeforeAd = false, rateBeforeAd = 1;
+let adRateGuardUntil = 0;
 let onResultsPage = resultsPageRegex.test(url);
 let onHomepage = homepageRegex.test(url);
 let onShorts = shortsRegex.test(url);
@@ -628,6 +629,20 @@ function adShowing() {
 }
 
 const AD_PLAYBACK_RATE = 10;
+// How long after an ad a lingering 10x is still treated as ours.
+const AD_RATE_GUARD_MS = 5000;
+
+// Hide our ad speed-up from other listeners. Speed-control extensions save the
+// rate on every `ratechange` and re-apply it to the next video, so without this
+// they remember 10x and the real video plays at 10x too. Window capture runs
+// before any document or element listener, and this script runs at
+// document_start, so we get the event first.
+function hideAdRateChange(event) {
+  if (adHandled && event.target?.playbackRate === AD_PLAYBACK_RATE) {
+    event.stopImmediatePropagation();
+  }
+}
+window.addEventListener?.('ratechange', hideAdRateChange, true);
 
 // Undo our ad mute and speed-up, restoring the user's pre-ad state. The speed
 // is only reset if it is still ours, so a rate YouTube re-applies is kept.
@@ -639,6 +654,16 @@ function restoreAdPlayback() {
     if (video.playbackRate === AD_PLAYBACK_RATE) video.playbackRate = rateBeforeAd;
   }
   adHandled = false;
+  adRateGuardUntil = Date.now() + AD_RATE_GUARD_MS;
+}
+
+// Something (another extension, or YouTube carrying the rate over to the new
+// video) can put 10x back just after the ad. Shortly after an ad, treat 10x as
+// ours and undo it.
+function undoLingeringAdRate(video) {
+  if (video && Date.now() < adRateGuardUntil && video.playbackRate === AD_PLAYBACK_RATE) {
+    video.playbackRate = rateBeforeAd;
+  }
 }
 
 // Mute ads and play them at 10x. YouTube ignores scripted clicks on Skip
@@ -655,6 +680,7 @@ function skipAds() {
   adActive = !!video && adShowing();
   if (!adActive) {
     restoreAdPlayback();
+    undoLingeringAdRate(video);
     return;
   }
 
